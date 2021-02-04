@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -127,3 +128,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+=======
+slprj/
+.ipynb_checkpoints/
+venv/
+>>>>>>> parent of 8692d68... removed the venv files
