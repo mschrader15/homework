@@ -26,7 +26,6 @@ def timing(f):
         result = f(*args, **kw)
         te = process_time()
         return te - ts, result
-
     return wrap
 
 # class DescentMethod:
