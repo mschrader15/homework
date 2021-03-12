@@ -1,6 +1,40 @@
-Mar 07 2021 21:21:26
-x_star = [-0.6119064121952982 -0.09372646657437822 -0.31330789439517076 0.04726755446850558 0.4252256790018325]
-f(x_star) = -3.824263317341652
-CPU time = 2.800163113
-inside bounds? = outside
+
+------------------------------------------------------------------
+Mar 11 2021 17:04:40
+method = cg
+x_star = [-1.0 1.0]
+f(x_star) = 44.0
+CPU time = 0.0001638620000000146
+inside bounds? = inside bounds
+first order check = 1st Order Condition satisfied
+------------------------------------------------------------------
+Mar 11 2021 17:05:17
+method = cg
+x_star = [-1.0 1.0]
+f(x_star) = 44.0
+CPU time = 0.00014389399999997776
+inside bounds? = inside bounds
+first order check = 1st Order Condition satisfied
+------------------------------------------------------------------
+Mar 11 2021 18:33:11
+method = cg
+x_star = [-1.0 1.0]
+f(x_star) = 44.0
+CPU time = 0.00014111999999999458
+inside bounds? = inside bounds
+first order check = 1st Order Condition satisfied
+------------------------------------------------------------------
+Mar 11 2021 18:33:22
+method = newton
+x_star = [1.0 -1.0]
+f(x_star) = 0.0
+CPU time = 0.0006841429999999704
+inside bounds? = inside bounds
 first order check = 1st Order Condition not satisfied
+------------------------------------------------------------------
+Mar 11 2021 20:53:06
+method = steepest descent
+x_star = [0.9997110900965881 -0.9997110900965881]
+f(x_star) = 9.181582552031387e-07
+CPU time = 5.337440117
+inside bounds? = inside bounds
