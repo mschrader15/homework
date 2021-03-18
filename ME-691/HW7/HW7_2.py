@@ -1,3 +1,4 @@
+import numpy as np
 from copy import copy, deepcopy
 from random import random, choice, randint, uniform
 
@@ -19,7 +20,7 @@ class Player:
         self._sum = 0
 
     def check_bust(self):
-        if self._sum < 0 or self._sum > 21:
+        if self._sum < 1 or self._sum > 21:
             return True
         return False
 
@@ -91,34 +92,35 @@ class Easy21:
         return -1
 
     def step(self, action, state):
+        state_1 = state.copy()
         if action == 1:
             while self.dealer.play_strategy(self.cards.get_card()):
                 pass
             r = self.calc_reward()
-            state.terminal = True
+            state_1.terminal = True
         else:
             card = self.cards.get_card()
             self.player.add_card(card)
             if self.player.check_bust():
-                state.terminal = True
+                state_1.terminal = True
                 r = -1
             else:
-                state.player_sum = self.player.get_sum()
+                state_1.player_sum = self.player.get_sum()
                 r = 0
-        return state, r
+        return state_1, r
 
 
 class MonteCarloAgent:
 
     def __init__(self, gym: Easy21):
         self.gym = gym()
-        self.Q = [[[0. for _ in range(len(self.gym.actions))] for _ in self.gym.states[0]] for _ in self.gym.states[1]]
+        self.Q = np.zeros((len(self.gym.states[1]), len(self.gym.states[0]), len(self.gym.actions_short)))
         self.N = deepcopy(self.Q)
         self.N0 = 100
         self.discount_factor = 1
 
     def calc_e(self, state: State) -> float:
-        return self.N0 / (self.N0 + sum(self.N[state.player_sum - 1][state.dealer_first - 1][:]) * 1.)
+        return self.N0 / (self.N0 + self.N[state.player_sum - 1, state.dealer_first - 1].sum() * 1.)
 
     def get_best_action(self, state):
         rewards = self.Q[state.player_sum - 1][state.dealer_first - 1]
@@ -137,9 +139,9 @@ class MonteCarloAgent:
             p_i = s_k.player_sum - 1
             d_i = s_k.dealer_first - 1
             G_t = sum([r_j * (self.discount_factor ** j) for j, (_, _, r_j) in enumerate(history[i:])])
-            self.N[p_i][d_i][a_k] += 1
-            alpha = 1.0 / self.N[p_i][d_i][a_k]
-            self.Q[p_i][d_i][a_k] += alpha * (G_t - self.Q[p_i][d_i][a_k])
+            self.N[p_i, d_i, a_k] += 1
+            alpha = 1.0 / self.N[p_i, d_i, a_k]
+            self.Q[p_i, d_i, a_k] += alpha * (G_t - self.Q[p_i, d_i, a_k])
 
     def _train(self, ):
         self.gym.reset()
@@ -149,11 +151,10 @@ class MonteCarloAgent:
             a_t = self.e_greedy(s_t)
             s_t_1, r_t = self.gym.step(a_t, s_t)
             history.append([s_t, a_t, r_t])
-            s_t = s_t_1.copy()
-
+            s_t = s_t_1
         self.update_q(history)
 
-    def run(self, iterations):
+    def run(self, iterations, ):
         for _ in range(int(iterations)):
             self._train()
 
@@ -169,36 +170,43 @@ class SARSAAgent(MonteCarloAgent):
         super(SARSAAgent, self).__init__(gym)
         self.E = deepcopy(self.Q)
 
-    def update_q(self, alpha, _lambda, delta, gamma):
-
     def _sarsa(self, _lambda):
         self.gym.reset()
         s_t = self.gym.initialize_game()
         a_t = self.e_greedy(s_t)
+        self.N[s_t.player_sum - 1][s_t.dealer_first - 1][a_t] += 1
+        a_t_1 = a_t
         while not s_t.terminal:
             s_t_1, r_t = self.gym.step(a_t, s_t)
-            Q_t = self.Q[s_t.player_sum - 1][s_t.dealer_first - 1][a_t]
+            idx = (s_t.player_sum - 1, s_t.dealer_first - 1, a_t)
+            Q_t = self.Q[idx]
             if not s_t_1.terminal:
                 a_t_1 = self.e_greedy(s_t_1)
-                self.N[s_t_1.player_sum - 1][s_t_1.dealer_first - 1][a_t_1] += 1
-                Q_t_1 = self.Q[s_t_1.player_sum - 1][s_t_1.dealer_first - 1][a_t_1]
-                d = r_t + (Q_t_1 - Q_t) * _lambda
+                idx_1 = (s_t_1.player_sum - 1, s_t_1.dealer_first - 1, a_t_1)
+                self.N[idx_1] += 1
+                Q_t_1 = self.Q[idx_1]
             else:
-                d = r_t + (0 - Q_t) * _lambda
-            self.E[s_t.player_sum - 1][s_t.dealer_first - 1][a_t] += 1
-            a = 1.0 / self.N[s_t.player_sum - 1][s_t.dealer_first - 1][a_t]
-            self.Q[s_t.player_sum - 1][s_t.dealer_first - 1][a_t] = Q_t + a * d * self.E[s_t.player_sum - 1][s_t.dealer_first - 1][a_t]
-            self.
+                Q_t_1 = 0
+            d = r_t + (Q_t_1 - Q_t) * _lambda
+            self.E[idx] += 1
+            a = 1.0 / self.N[idx]
+            self.Q += a * d * self.E
+            self.E *= self.discount_factor * _lambda
+            s_t = s_t_1
+            a_t = a_t_1
 
+    def run(self, iterations, _lambda):
+        for _ in range(iterations):
+            self._sarsa(_lambda)
 
 
 
 
 if __name__ == "__main__":
 
-    mc_agent = MonteCarloAgent(gym=Easy21, )
+    mc_agent = SARSAAgent(gym=Easy21, )
 
-    mc_agent.run(iterations=int(10000))
+    mc_agent.run(iterations=int(1000), _lambda=1)
 
     print(mc_agent.Q)
 
