@@ -1,13 +1,12 @@
-import numpy as np
 from enum import Enum
 from random import uniform, randint, choice, random
+from copy import copy
 
 
 def check_bust(score):
     if (score < 1) or (score > 21):
         return True
     return False
-
 
 class Action(Enum):
     STICK = 0
@@ -27,32 +26,34 @@ class Player:
 
     def __init__(self):
         self._cards = []
+        self._sum = 0
         self.reset_deck()
 
     def reset_deck(self):
-        pass
+        self._cards = []
+        self._sum = 0
 
     def set_first(self, card):
         self.reset_deck()
-        self._cards.append(card)
+        self.play_hand(card)
 
     def _add_to_hand(self, card):
         self._cards.append(card)
 
-    def _sum(self, ):
+    def _add_cards(self, ):
         return sum(self._cards)
 
     def play_hand(self, card):
         self._add_to_hand(card)
-        # return self._my_game_plan()
+        self._sum = self._add_cards()
 
     def _my_game_plan(self, ):
-        if not check_bust(self._sum()):
+        if not check_bust(self._sum):
             return Action.HIT
         return Action.STICK
 
     def get_sum(self):
-        return self._sum()
+        return self._sum
 
 
 class Dealer(Player):
@@ -75,7 +76,8 @@ class Dealer(Player):
 
     def take_turns(self, ):
         while self._my_game_plan():
-            self._add_to_hand(self.draw_card())
+            self.play_hand(self.draw_card())
+            self.play_hand(self.draw_card())
 
 
 #         return self._sum()
@@ -122,7 +124,7 @@ class Easy21:
             self.player.play_hand(next_card)
             if not check_bust(self.player.get_sum()):
                 current_state.update_sum(self.player.get_sum())
-                r = self.get_reward(current_state.player_sum)
+                r = 0
                 terminal = False
             else:
                 # current_state.player_sum = max()
@@ -132,8 +134,8 @@ class Easy21:
     def start_game(self, ):
         s = State(self.dealer.draw_card(first=True), )
         self.dealer.set_first(s.dealer_card)
-        s.player_sum = self.dealer.draw_card(first=True)
-        self.player.set_first(s.player_sum)
+        self.player.set_first(self.dealer.draw_card(first=True))
+        s.player_sum = self.player.get_sum()
         return s
 
 
@@ -143,8 +145,10 @@ class MonteCarloAgent(Player):
         self.game = gym
         self.Q = [[[0 for _ in range(len(self.game.action_space))]
                    for _ in range(len(space))] for space in self.game.state_space]
+        self.G = [[0 for _ in range(len(space))] for space in self.game.state_space]
         self.N = [[{'state': 0, 'action': [0, 0]} for _ in range(len(space))] for space in self.game.state_space]
-        self.N_0 = 100
+        self.N_0 = 10000
+        self.discount_factor = 1
 
     def _get_optimal_action(self, state):
         rewards = self.Q[state.player_sum - 1][state.dealer_card - 1]
@@ -157,24 +161,36 @@ class MonteCarloAgent(Player):
         return self._get_optimal_action(state)
 
     def _calc_e(self, state):
-        # print(state.player_sum)
         return self.N_0 / (self.N_0 + self.N[state.player_sum - 1][state.dealer_card - 1]['state'])
+
+    def _update_Q(self, history):
+        for i, (s_t, a_t, r_t) in enumerate(history):
+            player_index = s_t.player_sum - 1
+            dealer_index = s_t.dealer_card - 1
+            # G_t = sum([r_k * (self.discount_factor ** i_i) for i_i, (_, _, r_k) in enumerate(history[i:])])
+            # self.G[player_index][dealer_index] += G_t
+            self.Q[player_index][dealer_index][a_t] += (1 / self.N[player_index][dealer_index]['action'][a_t]) * \
+                                                       (r_t - self.Q[player_index][dealer_index][a_t])
 
     def _run(self, ):
         t = 0
+        history = []
         s_t = self.game.start_game()
-        a_t = self.e_greedy(self._calc_e(s_t), s_t)
         while True:
-            s_t, r_t, terminal = self.game.step(s_t, self.game.action_space[a_t])
             a_t = self.e_greedy(self._calc_e(s_t), s_t)
+            # s_t, r_t, terminal = self.game.step(s_t, self.game.action_space[a_t])
             self.N[s_t.player_sum - 1][s_t.dealer_card - 1]['state'] += 1
             self.N[s_t.player_sum - 1][s_t.dealer_card - 1]['action'][a_t] += 1
-            self.Q[s_t.player_sum - 1][s_t.dealer_card - 1][a_t] += \
-                (1 / self.N[s_t.player_sum - 1][s_t.dealer_card - 1]['action'][a_t]) * \
-                (r_t - self.Q[s_t.player_sum - 1][s_t.dealer_card - 1][a_t])
+            s_t_1, r_t, terminal = self.game.step(copy(s_t), self.game.action_space[a_t])
+            history.append([s_t, a_t, r_t])
+            s_t = s_t_1
+            # self.Q[s_t.player_sum - 1][s_t.dealer_card - 1][a_t] += \
+            #     (1 / self.N[s_t.player_sum - 1][s_t.dealer_card - 1]['action'][a_t]) * \
+            #     (r_t_1 - self.Q[s_t.player_sum - 1][s_t.dealer_card - 1][a_t])
             if terminal:
                 break
             t += 1
+        self._update_Q(history)
         return t
 
     def optimize(self, iterations):
@@ -182,10 +198,16 @@ class MonteCarloAgent(Player):
         for iteration in range(iterations):
             self._run()
 
+    def get_V_star(self, ):
+        player_sum = [row[0][0] for row in self.game.state_space]
+        dealer_showing = [item[1] for item in self.game.state_space[0]]
+        V_star = [[1 - actions.index(max(actions)) for actions in dealer] for dealer in self.Q]
+        return player_sum, dealer_showing, V_star
+
 
 if __name__ == "__main__":
     mc_agent = MonteCarloAgent(gym=Easy21(), )
 
-    mc_agent.optimize(iterations=10000)
+    mc_agent.optimize(iterations=int(10000))
 
-    # print(mc_agent.Q)
+    print(mc_agent.Q)
