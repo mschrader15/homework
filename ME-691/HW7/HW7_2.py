@@ -200,6 +200,83 @@ class SARSAAgent(MonteCarloAgent):
             self._sarsa(_lambda)
 
 
+class LinearFunctionApproximation(MonteCarloAgent):
+
+    def __init__(self, gym):
+        super(LinearFunctionApproximation, self).__init__(gym)
+
+        self._e = 0.05
+        self._lambda = 1
+        self._alpha = 0.01
+        self._dealer_c = [[1, 4], [4, 7], [7, 10]]
+        self._player_c = [[1, 6], [4, 9], [7, 12], [10, 15], [13, 18], [16, 21]]
+        self._action_c = [0, 1]
+        # parameters are initialize randomly
+        self._shape = list(map(len, [self._dealer_c, self._player_c, self._action_c]))
+        self._theta = self.calc_theta()
+        self._shaped_zeros = np.zeros(self._shape, dtype=np.int)
+        self._E = copy(self._shaped_zeros)
+        self._param_num = np.prod(self._shape)
+
+    def calc_theta(self):
+        return np.random.randn(*self.number_of_parameters) * 0.1
+
+    def phi(self, s, a):
+        d_sum = s.dealer_fist
+        p_sum = s.player_sum
+        features = copy(self._shaped_zeros)
+        d_features = [(i, x[0] <= d_sum <= x[1]) for i, x in enumerate(self._dealer_c)]
+        p_features = [(i, x[0] <= p_sum <= x[1]) for i, x in enumerate(self._player_c)]
+        for i, d_inside in d_features:
+            if d_inside:
+                for j, p_inside in p_features:
+                    if p_inside:
+                        features[i, j, a] = 1
+        return features
+
+    def get_best_action(self, state):
+        rewards = [self.phi(state, a) for a in self._action_c]
+        max_reward = max(rewards)
+        return choice([self.gym.actions_short[i] for i, reward in enumerate(rewards) if reward >= max_reward])
+
+    def calc_e(self, state=None) -> float:
+        return self._e
+
+    def _step(self, iterations):
+        self.gym.reset()
+        s_t = self.gym.initialize_game()
+        a_t = self.e_greedy(s_t)
+        self._E = copy(self._shaped_zeros)
+        self._theta = self.calc_theta()
+        while not s_t.terminal:
+            s_t_1, r_t = self.gym.step(a_t, s_t)
+            phi_t = self.phi(s_t, a_t)
+            q = np.dot(phi_t, self._theta)
+            if not s_t_1.terminal:
+                a_t_1 = self.e_greedy(s_t_1)
+                phi_t_1 = self.phi(s_t_1, a_t_1)
+                q_t_1 = np.dot(phi_t_1, self._theta)
+                d = r_t + q_t_1 - q
+            else:
+                d = r_t - q
+            self._E += phi_t
+            self._theta += self._alpha * d * self._E
+            self._E *= self.discount_factor * self._lambda
+            s_t = s_t_1
+            a_t = a_t_1
+
+    def run(self, iterations, _lambda, log_error=False):
+        error = []
+        for i in range(iterations):
+            if log_error:
+                error.append((i, self._sarsa(_lambda, log_error)))
+            self._sarsa(_lambda, log_error)
+        if log_error:
+            return error
+
+
+
+
 
 
 if __name__ == "__main__":
