@@ -202,28 +202,28 @@ class SARSAAgent(MonteCarloAgent):
 
 class LinearFunctionApproximation(MonteCarloAgent):
 
-    def __init__(self, gym):
+    def __init__(self, gym, Q_star=None):
         super(LinearFunctionApproximation, self).__init__(gym)
 
         self._e = 0.05
         self._lambda = 1
         self._alpha = 0.01
+        self.Q_star = Q_star
         self._dealer_c = [[1, 4], [4, 7], [7, 10]]
         self._player_c = [[1, 6], [4, 9], [7, 12], [10, 15], [13, 18], [16, 21]]
         self._action_c = [0, 1]
         # parameters are initialize randomly
         self._shape = list(map(len, [self._dealer_c, self._player_c, self._action_c]))
         self._theta = self.calc_theta()
-        self._shaped_zeros = np.zeros(self._shape, dtype=np.int)
+        self._shaped_zeros = np.zeros(self._shape,)
         self._E = copy(self._shaped_zeros)
         self._param_num = np.prod(self._shape)
 
     def calc_theta(self):
-        return np.random.randn(*self.number_of_parameters) * 0.1
+        return np.random.randn(*self._shape) * 0.1
 
     def phi(self, s, a):
-        d_sum = s.dealer_fist
-        p_sum = s.player_sum
+        d_sum, p_sum = s.dealer_first, s.player_sum
         features = copy(self._shaped_zeros)
         d_features = [(i, x[0] <= d_sum <= x[1]) for i, x in enumerate(self._dealer_c)]
         p_features = [(i, x[0] <= p_sum <= x[1]) for i, x in enumerate(self._player_c)]
@@ -235,27 +235,36 @@ class LinearFunctionApproximation(MonteCarloAgent):
         return features
 
     def get_best_action(self, state):
-        rewards = [self.phi(state, a) for a in self._action_c]
+        rewards = [np.dot(self.phi(state, a).flatten(), self._theta.flatten()) for a in self._action_c]
         max_reward = max(rewards)
         return choice([self.gym.actions_short[i] for i, reward in enumerate(rewards) if reward >= max_reward])
 
     def calc_e(self, state=None) -> float:
         return self._e
 
-    def _step(self, iterations):
+    def compose_Q(self):
+        Q = np.zeros((len(self.gym.states[0]), len(self.gym.states[1]), len(self.gym.actions_short)))
+        for i in self.gym.states[0]:
+            for j in self.gym.states[1]:
+                for a in self.gym.actions_short:
+                    Q[i, j, a.value] = np.dot(self.phi(State(player_sum=j, dealer_first=i), a_t), self._theta)
+        return Q
+
+    def _step(self, log_error):
         self.gym.reset()
         s_t = self.gym.initialize_game()
         a_t = self.e_greedy(s_t)
         self._E = copy(self._shaped_zeros)
-        self._theta = self.calc_theta()
+        # self._theta = self.calc_theta()
+        a_t_1 = a_t
         while not s_t.terminal:
             s_t_1, r_t = self.gym.step(a_t, s_t)
             phi_t = self.phi(s_t, a_t)
-            q = np.dot(phi_t, self._theta)
+            q = np.dot(phi_t.flatten(), self._theta.flatten())
             if not s_t_1.terminal:
                 a_t_1 = self.e_greedy(s_t_1)
                 phi_t_1 = self.phi(s_t_1, a_t_1)
-                q_t_1 = np.dot(phi_t_1, self._theta)
+                q_t_1 = np.dot(phi_t_1.flatten(), self._theta.flatten())
                 d = r_t + q_t_1 - q
             else:
                 d = r_t - q
@@ -264,26 +273,28 @@ class LinearFunctionApproximation(MonteCarloAgent):
             self._E *= self.discount_factor * self._lambda
             s_t = s_t_1
             a_t = a_t_1
+        if log_error:
+            return np.sum(np.square(self.Q_star - self.compose_Q()))
+        return None
 
-    def run(self, iterations, _lambda, log_error=False):
+    def run(self, iterations, log_error=False):
         error = []
         for i in range(iterations):
             if log_error:
-                error.append((i, self._sarsa(_lambda, log_error)))
-            self._sarsa(_lambda, log_error)
+                error.append((i, self._step(log_error)))
+            self._step(log_error)
         if log_error:
             return error
-
-
-
-
+        self.Q = self.compose_Q()
 
 
 if __name__ == "__main__":
 
-    mc_agent = SARSAAgent(gym=Easy21, )
+    mc_agent = LinearFunctionApproximation(gym=Easy21, )
 
-    mc_agent.run(iterations=int(1000), _lambda=1)
+    mc_agent._lambda = 0.1
+
+    mc_agent.run(iterations=int(1000),)
 
     print(mc_agent.Q)
 
