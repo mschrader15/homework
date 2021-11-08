@@ -1,3 +1,7 @@
+# MacOS
+.DS_Store
+*.virtual_documents/*
+
 # Matlab
 .idea/
 slprj/
