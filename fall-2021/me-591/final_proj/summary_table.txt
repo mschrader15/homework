@@ -1,0 +1,8 @@
+\begin{tabular}{llllllll}
+\toprule
+{} &    Cost [\$] & Yearly Electric Cost [\$] & Yearly CO2 [Mton] & Electric Energy Demand [GWh] & Electric Power Demand [MW] & Payback Period &    ROI [\%] \\
+\midrule
+No Solar &           - &               33,034,052 &        39,690,322 &                          244 &                         28 &              - &          - \\
+Solar    &  21,064,188 &               25,186,087 &        34,394,988 &                          212 &                         24 &           6.25 &  19.645312 \\
+\bottomrule
+\end{tabular}
