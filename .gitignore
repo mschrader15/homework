@@ -1,3 +1,6 @@
+# Tensorboard
+*tensorboard_logs/
+
 # MacOS
 .DS_Store
 .virtual_documents/
