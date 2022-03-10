@@ -1,3 +1,9 @@
+# ECE 693
+spring-2022/ece-693/data/
+*.zip
+*.keras
+*.out
+
 # Tensorboard
 *tensorboard_logs/
 
