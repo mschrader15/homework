@@ -1,5 +1,6 @@
 # ECE 693
 spring-2022/ece-693/data/
+spring-2022/ece-693/HW4/*/*.csv
 *.zip
 *.keras
 *.out
