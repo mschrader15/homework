@@ -5,6 +5,7 @@ spring-2022/ece-693/HW4/*/*.csv
 *.zip
 *.keras
 *.out
+*.h5
 
 # Tensorboard
 *tensorboard_logs/
